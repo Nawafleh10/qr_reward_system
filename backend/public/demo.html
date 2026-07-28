@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<title>تجربة نظام الجوائز بالـ QR</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 760px; margin: 30px auto; padding: 0 16px; background:#111; color:#eee; }
+  h1 { font-size: 20px; }
+  .step { background:#1c1c1c; border:1px solid #333; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .step h2 { margin-top:0; font-size:16px; color:#8ecbff; }
+  button { background:#2e7dff; color:#fff; border:none; padding: 10px 16px; border-radius:8px; cursor:pointer; font-size:14px; margin-left:8px; margin-bottom:8px; }
+  button:disabled { background:#444; cursor:not-allowed; }
+  button.danger { background:#c0392b; }
+  #qrImg { display:block; margin-top:10px; background:#fff; padding:8px; border-radius:8px; width:160px; }
+  .msg { margin-top:10px; padding:10px; border-radius:8px; font-size:14px; }
+  .msg.ok { background:#123d1f; color:#8fe3a3; }
+  .msg.err { background:#3d1212; color:#ff9d9d; }
+  #meals { display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; }
+  .meal { border:2px solid #333; border-radius:10px; padding:6px; cursor:pointer; width:90px; background:#222; }
+  .meal img { width:74px; height:74px; object-fit:cover; border-radius:6px; }
+  .meal span { display:block; font-size:11px; margin-top:4px; color:#ccc; }
+  .meal:hover { border-color:#2e7dff; }
+  .cardsGrid { display:flex; flex-wrap:wrap; gap:16px; margin-top:10px; }
+  .rewardCard { width:220px; }
+  .rewardWrap { position:relative; width:220px; height:110px; border-radius:8px; overflow:hidden; }
+  .rewardWrap img.base { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; filter: grayscale(100%); }
+  .cell { position:absolute; background-repeat:no-repeat; }
+  .rewardCard p { margin:6px 0 0; font-size:13px; color:#ccc; }
+  code { background:#000; padding:2px 6px; border-radius:4px; }
+</style>
+</head>
+<body>
+  <h1>تجربة حية: نظام جوائز الـ QR (يتصل بالسيرفر الحقيقي على localhost:4000)</h1>
+
+  <div class="step">
+    <h2>١) محاكاة تحضير سندويشة → توليد QR (بدون اختيار وجبة)</h2>
+    <button id="btnGenerate">توليد QR جديد</button>
+    <img id="qrImg" style="display:none" />
+    <div id="genMsg"></div>
+  </div>
+
+  <div class="step">
+    <h2>٢) الزبون يمسح الـ QR</h2>
+    <button id="btnScan" disabled>مسح هذا الـ QR</button>
+    <button id="btnScanAgain" class="danger" disabled>حاول تمسحه مرة ثانية (اختبار إعادة الاستخدام)</button>
+    <div id="scanMsg"></div>
+    <div id="meals" style="display:none"></div>
+  </div>
+
+  <div class="step">
+    <h2>٣) كل كروت الجوائز يلي عند هذا الزبون (كرت مستقل لكل نوع وجبة اختارها)</h2>
+    <div id="cardsGrid" class="cardsGrid"></div>
+  </div>
+
+<script>
+const API = 'http://localhost:4000';
+const customerId = 'demo-customer-1';
+let currentToken = null;
+
+function renderCard(container, progress) {
+  const { rewardImage, unlockedSections, completed } = progress;
+  const card = document.createElement('div');
+  card.className = 'rewardCard';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'rewardWrap';
+
+  const base = document.createElement('img');
+  base.className = 'base';
+  base.src = API + rewardImage.imageUrl;
+  wrap.appendChild(base);
+
+  const cols = rewardImage.cols, rows = rewardImage.rows;
+  const W = 220, H = 110;
+  const cellW = W / cols, cellH = H / rows;
+
+  unlockedSections.forEach(index => {
+    const row = Math.floor(index / cols), col = index % cols;
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.style.left = (col * cellW) + 'px';
+    cell.style.top = (row * cellH) + 'px';
+    cell.style.width = cellW + 'px';
+    cell.style.height = cellH + 'px';
+    cell.style.backgroundImage = `url(${API + rewardImage.imageUrl})`;
+    cell.style.backgroundSize = `${W}px ${H}px`;
+    cell.style.backgroundPosition = `-${col * cellW}px -${row * cellH}px`;
+    wrap.appendChild(cell);
+  });
+
+  const label = document.createElement('p');
+  label.textContent = completed
+    ? `🎉 ${rewardImage.name}: اكتملت! فاز الزبون.`
+    : `${rewardImage.name}: ${unlockedSections.length} / ${rewardImage.totalSections} أقسام مفتوحة`;
+
+  card.appendChild(wrap);
+  card.appendChild(label);
+  container.appendChild(card);
+}
+
+async function loadAllCards() {
+  const res = await fetch(`${API}/api/progress/${customerId}`);
+  const { progress } = await res.json();
+  const grid = document.getElementById('cardsGrid');
+  grid.innerHTML = '';
+  progress.forEach(p => renderCard(grid, p));
+}
+
+document.getElementById('btnGenerate').onclick = async () => {
+  // No meal chosen here - just a generic QR, exactly like what gets printed
+  // and stuck on a sandwich.
+  const res = await fetch(`${API}/api/purchases/qrcode`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
+  const data = await res.json();
+  currentToken = data.token;
+
+  const img = document.getElementById('qrImg');
+  img.src = `${API}/api/qrcode/${currentToken}/image`;
+  img.style.display = 'block';
+  document.getElementById('genMsg').innerHTML =
+    `<div class="msg ok">تم توليد QR جديد لعملية شراء رقم <code>${data.purchaseId}</code></div>`;
+
+  document.getElementById('btnScan').disabled = false;
+  document.getElementById('btnScanAgain').disabled = true;
+  document.getElementById('scanMsg').innerHTML = '';
+  document.getElementById('meals').style.display = 'none';
+  document.getElementById('meals').innerHTML = '';
+};
+
+// Step 1 of scanning: just checks the code is still valid, doesn't consume it.
+async function checkThenShowMeals() {
+  const msgEl = document.getElementById('scanMsg');
+  const res = await fetch(`${API}/api/scan/${currentToken}`);
+
+  if (!res.ok) {
+    const data = await res.json();
+    msgEl.innerHTML = `<div class="msg err">${data.message}</div>`;
+    return;
+  }
+
+  msgEl.innerHTML = `<div class="msg ok">الكود صحيح! اختر وجبتك تحت لفتح الجائزة:</div>`;
+  await loadMealsPicker();
+}
+
+async function loadMealsPicker() {
+  const res = await fetch(`${API}/api/reward-images`);
+  const { rewardImages } = await res.json();
+  const wrap = document.getElementById('meals');
+  wrap.innerHTML = '';
+  wrap.style.display = 'flex';
+
+  rewardImages.forEach(img => {
+    const el = document.createElement('div');
+    el.className = 'meal';
+    el.innerHTML = `<img src="${API + img.imageUrl}" /><span>${img.name}</span>`;
+    el.onclick = () => chooseMeal(img.id);
+    wrap.appendChild(el);
+  });
+}
+
+// Step 2 of scanning: the customer's choice + the actual atomic claim.
+async function chooseMeal(rewardImageId) {
+  const res = await fetch(`${API}/api/scan`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: currentToken, customerId, rewardImageId }),
+  });
+  const data = await res.json();
+  const msgEl = document.getElementById('scanMsg');
+
+  if (res.ok) {
+    msgEl.innerHTML = `<div class="msg ok">تم فتح قسم جديد من ${data.progress.rewardImage.name}! ✅</div>`;
+    document.getElementById('meals').style.display = 'none';
+    await loadAllCards();
+    document.getElementById('btnScan').disabled = true;
+    document.getElementById('btnScanAgain').disabled = false;
+  } else {
+    msgEl.innerHTML = `<div class="msg err">${data.message}</div>`;
+  }
+}
+
+document.getElementById('btnScan').onclick = checkThenShowMeals;
+document.getElementById('btnScanAgain').onclick = checkThenShowMeals;
+
+loadAllCards();
+</script>
+</body>
+</html>

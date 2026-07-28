@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<title>ملصق QR للطباعة</title>
+<style>
+  body { font-family: system-ui, sans-serif; text-align:center; padding: 24px; }
+  #setup { max-width: 360px; margin: 0 auto 20px; }
+  button { padding: 14px 28px; background:#2e7dff; color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:16px; }
+  #label { display:none; margin-top: 20px; }
+  #label img { width: 260px; height: 260px; }
+  #label p { font-size: 13px; color:#333; margin-top: 6px; }
+  .actions { margin-top: 14px; display:flex; gap:8px; justify-content:center; }
+  .actions button { padding: 10px 18px; font-size:14px; }
+  @media print {
+    #setup, .no-print { display:none !important; }
+    #label { display:block !important; }
+    body { padding: 0; }
+  }
+</style>
+</head>
+<body>
+  <div id="setup">
+    <h2>ملصق QR لكل سندويشة</h2>
+    <p>ضغطة وحدة بس - بدون ما تكتب أي شي. الزبون هو يلي بيختار الوجبة لما يمسح الكود.</p>
+    <button id="btnMake">توليد QR جديد</button>
+  </div>
+
+  <div id="label">
+    <img id="qrImg" />
+    <p id="labelText">امسح الكود بعد استلام الوجبة، وبعدها اختار وجبتك لفتح جائزتك</p>
+    <div class="actions no-print">
+      <button onclick="window.print()">طباعة</button>
+      <button onclick="location.reload()">ملصق جديد</button>
+    </div>
+  </div>
+
+<script>
+const API = 'http://localhost:4000';
+
+document.getElementById('btnMake').onclick = async () => {
+  const res = await fetch(`${API}/api/purchases/qrcode`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
+
+  if (!res.ok) {
+    alert('صار خطأ بتوليد الكود.');
+    return;
+  }
+
+  const data = await res.json();
+  document.getElementById('qrImg').src = `${API}/api/qrcode/${data.token}/image`;
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('label').style.display = 'block';
+};
+</script>
+</body>
+</html>

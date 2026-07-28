@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// One reward card design - typically one per meal type (e.g. one card for
+// shawarma, a different one for falafel). Add more rows any time you want a
+// new meal to have its own card - no code changes needed.
+model RewardImage {
+  id            Int      @id @default(autoincrement())
+  name          String
+  imageUrl      String   @unique
+  totalSections Int
+  rows          Int
+  cols          Int
+  isActive      Boolean  @default(true) // offered to customers as a choice at scan time
+  createdAt     DateTime @default(now())
+
+  progress CustomerRewardProgress[]
+  qrCodes  PurchaseQrCode[]
+}
+
+// Tracks how much of one specific reward card a single customer has
+// unlocked. A customer can hold progress on several cards at once (one per
+// meal type they've chosen to collect), each tracked independently.
+model CustomerRewardProgress {
+  id               Int      @id @default(autoincrement())
+  customerId       String
+  rewardImageId    Int
+  unlockedSections String   @default("[]") // JSON-encoded array of unlocked section indexes
+  completed        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  rewardImage RewardImage      @relation(fields: [rewardImageId], references: [id])
+  qrCodes     PurchaseQrCode[]
+
+  @@unique([customerId, rewardImageId])
+}
+
+// One QR code per purchase/item (e.g. one per sandwich). Printed generic -
+// NOT tied to any meal yet. Single use only - see rewardService.js for the
+// atomic claim that guarantees it can never be redeemed twice. Both
+// customerId and rewardImageId are unknown at print time; they're filled in
+// together, atomically, the moment a customer scans it and picks which
+// reward card to apply it to.
+model PurchaseQrCode {
+  id               Int       @id @default(autoincrement())
+  purchaseId       String    @unique
+  customerId       String?
+  rewardImageId    Int?
+  token            String    @unique
+  status           String    @default("ACTIVE") // ACTIVE | USED | EXPIRED
+  rewardProgressId Int?
+  createdAt        DateTime  @default(now())
+  usedAt           DateTime?
+
+  rewardImage    RewardImage?             @relation(fields: [rewardImageId], references: [id])
+  rewardProgress CustomerRewardProgress? @relation(fields: [rewardProgressId], references: [id])
+}
