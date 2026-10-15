@@ -19,8 +19,9 @@ const DB_FILE = path.join(__dirname, 'data.json');
 const STATUSES = ['RECEIVED', 'PREPARING', 'READY', 'DELIVERED'];
 
 // ---- tiny JSON-file store: { day, counter, orders: { token: order } } ----
-let db = { day: '', counter: 0, orders: {} };
+let db = { day: '', counter: 0, orders: {}, leads: [] };
 try { db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); } catch (_) {}
+db.leads = db.leads || [];
 const save = () => fs.writeFile(DB_FILE, JSON.stringify(db), () => {});
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -103,6 +104,26 @@ app.get('/api/orders/:token/stream', (req, res) => {
   res.write(`data: ${JSON.stringify(publicOrder(o))}\n\n`);
   res.on('close', () => watchers.get(o.token)?.delete(res));
 });
+
+// Contact form (public). Saved on the server; staff read them via /api/leads.
+const hits = new Map(); // ip -> [timestamps] (max 5 per hour)
+app.post('/api/contact', (req, res) => {
+  const b = req.body || {};
+  if (b.website) return res.json({ ok: true }); // honeypot: bots fill this hidden field
+  const ip = req.ip, now = Date.now();
+  const recent = (hits.get(ip) || []).filter((t) => now - t < 3600000);
+  if (recent.length >= 5) return res.status(429).json({ error: 'محاولات كثيرة، جرّب بعد قليل' });
+  const clean = (v, n) => String(v || '').trim().slice(0, n);
+  const lead = { id: crypto.randomBytes(5).toString('hex'), at: now, topic: clean(b.topic, 40), name: clean(b.name, 80),
+    contact: clean(b.contact, 120), company: clean(b.company, 80), message: clean(b.message, 2000) };
+  if (!lead.name || !lead.contact || !/(@.+\..+)|(\+?[\d\s-]{7,})/.test(lead.contact))
+    return res.status(400).json({ error: 'اكتب اسمك وبريدك الإلكتروني أو رقم جوالك بشكل صحيح' });
+  hits.set(ip, [...recent, now]);
+  db.leads.push(lead); save();
+  console.log(`New contact lead: ${lead.name} <${lead.contact}> [${lead.topic}]`);
+  res.status(201).json({ ok: true });
+});
+app.get('/api/leads', staffOnly, (req, res) => res.json([...db.leads].reverse()));
 
 app.get('/api/qr', async (req, res) => {
   try {

@@ -17,6 +17,7 @@
   <div id="app" hidden>
     <div class="row"><input id="note" placeholder="ملاحظة (اختياري) مثل: آيس لاتيه" maxlength="60" /><button class="lime" id="newOrder">+ طلب جديد</button></div>
     <div class="orders" id="orders"></div>
+    <details id="leadsBox" style="margin-top:26px"><summary style="cursor:pointer;font-weight:700">رسائل التواصل من الموقع (<span id="leadN">0</span>)</summary><div class="orders" id="leads"></div></details>
   </div>
 </div>
 <dialog id="dlg">
@@ -48,7 +49,16 @@ function showQr(o) {
 async function setStatus(token, status) {
   await fetch(`/api/orders/${token}/status`, { method: 'POST', headers: H(), body: JSON.stringify({ status }) });
 }
+async function loadLeads() {
+  const r = await fetch('/api/leads', { headers: H() }); if (!r.ok) return;
+  const L = await r.json(); $('leadN').textContent = L.length; $('leads').innerHTML = '';
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  for (const l of L) { const el = document.createElement('div'); el.className = 'o'; el.style.alignItems = 'flex-start';
+    el.innerHTML = `<div class="meta" style="color:#111;font-size:14px"><b style="font-size:16px;min-width:0">${esc(l.name)}</b> · <span dir="ltr">${esc(l.contact)}</span>${l.company ? ' · ' + esc(l.company) : ''}<br><small>${esc(l.topic)} — ${new Date(l.at).toLocaleString('ar')}</small><p style="margin:6px 0 0;white-space:pre-wrap">${esc(l.message)}</p></div>`;
+    $('leads').append(el); }
+}
 async function load() {
+  loadLeads();
   const r = await fetch('/api/orders', { headers: H() });
   if (!r.ok) return;
   const list = await r.json();

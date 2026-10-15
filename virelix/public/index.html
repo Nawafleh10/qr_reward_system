@@ -77,6 +77,30 @@ tbody tr+tr td { border-top:1px solid var(--line); } td:last-child { background:
 .final { position:relative; border-radius:34px; padding:70px 30px; text-align:center; background:linear-gradient(135deg,#3b1d8f,#1b3a9c 55%,#0e7490); border:1px solid #ffffff22; overflow:hidden; }
 .final p { font-size:20px; margin:14px auto 30px; max-width:520px; color:#e5e1ff; }
 .final .btn { background:#fff; color:#1a0f4a; box-shadow:0 10px 30px #0006; }
+
+/* contact */
+.contact { display:grid; grid-template-columns:1.25fr .75fr; gap:22px; align-items:start; }
+.panel { background:var(--card); border:1px solid var(--line); border-radius:26px; padding:30px; }
+.topics { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:22px; }
+.topics label { cursor:pointer; } .topics input { position:absolute; opacity:0; pointer-events:none; }
+.topics span { display:inline-block; border:1px solid var(--line); background:#ffffff08; border-radius:99px; padding:9px 18px; font-weight:700; font-size:15px; transition:.2s; }
+.topics input:checked + span { background:linear-gradient(90deg,#7c3aed,#5b5bf0); border-color:transparent; box-shadow:0 6px 20px #7c3aed55; }
+.topics input:focus-visible + span { outline:2px solid var(--cyan); }
+.fld { margin-bottom:16px; } .fld label { display:block; font-size:14px; color:var(--mute); margin-bottom:6px; }
+.fld input,.fld textarea { width:100%; font:inherit; color:var(--ink); background:#ffffff08; border:1px solid var(--line); border-radius:14px; padding:13px 15px; outline:none; transition:.2s; }
+.fld input:focus,.fld textarea:focus { border-color:var(--cyan); box-shadow:0 0 0 3px #22d3ee22; }
+.fld textarea { min-height:120px; resize:vertical; }
+.two { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.hp { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; clip-path:inset(50%); }
+#fmsg { margin-top:14px; font-weight:700; min-height:24px; } #fmsg.ok { color:#4ade80; } #fmsg.bad { color:var(--red); }
+button.btn { border:0; font-family:inherit; cursor:pointer; } button.btn:disabled { opacity:.6; cursor:wait; }
+.info .row { display:flex; gap:14px; align-items:center; margin-bottom:18px; }
+.info .ico { width:44px; height:44px; flex:none; border-radius:14px; background:#22d3ee1a; border:1px solid #22d3ee44; display:grid; place-items:center; font-size:20px; }
+.info small { display:block; color:var(--mute); font-size:13px; } .info b,.info a { font-weight:700; }
+.info a { direction:ltr; unicode-bidi:isolate; display:inline-block; }
+.wa { display:flex; align-items:center; justify-content:center; gap:10px; background:#22c55e; color:#04230f; font-weight:900; border-radius:99px; padding:14px 22px; font-size:17px; margin-top:8px; box-shadow:0 10px 28px #22c55e44; transition:transform .15s; } .wa:hover { transform:translateY(-2px); }
+.wafab { position:fixed; bottom:20px; left:20px; z-index:50; width:58px; height:58px; border-radius:50%; background:#22c55e; display:grid; place-items:center; box-shadow:0 10px 30px #000a; font-size:30px; transition:transform .15s; } .wafab:hover { transform:scale(1.08); }
+@media (max-width:860px){ .contact{grid-template-columns:1fr} .two{grid-template-columns:1fr} }
 footer { padding:40px 0 50px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:14px; color:var(--mute); font-size:15px; border-top:1px solid var(--line); }
 .rv { opacity:0; transform:translateY(24px); transition:.65s; } .rv.in { opacity:1; transform:none; }
 @media (prefers-reduced-motion:reduce){ .owl,.bell{animation:none} .rv{opacity:1;transform:none} }
@@ -86,8 +110,8 @@ footer { padding:40px 0 50px; display:flex; justify-content:space-between; flex-
 <div class="c">
   <nav>
     <a class="brand" href="/">VIRE<b>LIX</b></a>
-    <div class="links"><a href="#how">كيف يشتغل</a><a href="#features">المميزات</a><a href="#compare">المقارنة</a></div>
-    <a class="btn cy" href="/staff.html" style="padding:11px 22px;font-size:16px">لوحة الكاشير</a>
+    <div class="links"><a href="#how">كيف يشتغل</a><a href="#features">المميزات</a><a href="#compare">المقارنة</a><a href="#contact">تواصل</a></div>
+    <a class="btn cy" href="#contact" style="padding:11px 22px;font-size:16px">تواصل معنا</a>
   </nav>
 
   <header class="hero">
@@ -95,7 +119,7 @@ footer { padding:40px 0 50px; display:flex; justify-content:space-between; flex-
       <span class="eyebrow mono"><i></i>ORDER ALERTS · NO PAGERS · NO APP</span>
       <h1>جوال زبونك<br><span class="g">= جهاز النداء.</span></h1>
       <p class="lead">الزبون يمسح QR ويفتح صفحة طلبه على جواله. أول ما يجهز طلبه، جواله يرنّ ويهتز. بدون أجهزة تنكسر أو تضيع، وبدون تطبيق يحمّله.</p>
-      <div class="cta"><a class="btn" href="/staff.html">جرّبه مجاناً ←</a><a class="btn line" href="#how">شوف كيف يشتغل</a></div>
+      <div class="cta"><a class="btn" href="#contact">جرّبه مجاناً ←</a><a class="btn line" href="#how">شوف كيف يشتغل</a></div>
     </div>
     <div class="stage" aria-hidden="true">
       <div class="owl"></div>
@@ -158,15 +182,48 @@ footer { padding:40px 0 50px; display:flex; justify-content:space-between; flex-
       </tbody></table></div>
   </section>
 
+  <section id="contact">
+    <div class="head rv"><span class="mono">CONTACT</span><h2>خلّينا <span class="g">نتواصل</span></h2><p>قلنا شو تحتاج، ونرد عليك خلال يوم عمل.</p></div>
+    <div class="contact">
+      <form class="panel rv" id="cf" novalidate>
+        <div class="mono" style="color:var(--mute);margin-bottom:12px;direction:ltr;text-align:start">WHAT DO YOU NEED?</div>
+        <div class="topics">
+          <label><input type="radio" name="topic" value="تجربة نظام النداء" checked><span>تجربة نظام النداء</span></label>
+          <label><input type="radio" name="topic" value="موقع"><span>موقع</span></label>
+          <label><input type="radio" name="topic" value="تطبيق"><span>تطبيق</span></label>
+          <label><input type="radio" name="topic" value="هوية بصرية"><span>هوية بصرية</span></label>
+          <label><input type="radio" name="topic" value="تسويق"><span>تسويق</span></label>
+          <label><input type="radio" name="topic" value="مش متأكد"><span>مش متأكد بعد</span></label>
+        </div>
+        <div class="two">
+          <div class="fld"><label for="f-name">الاسم *</label><input id="f-name" name="name" autocomplete="name" required maxlength="80"></div>
+          <div class="fld"><label for="f-contact">البريد الإلكتروني أو رقم الجوال *</label><input id="f-contact" name="contact" autocomplete="email" required maxlength="120" dir="ltr" style="text-align:start"></div>
+        </div>
+        <div class="fld"><label for="f-company">الشركة / المحل (اختياري)</label><input id="f-company" name="company" autocomplete="organization" maxlength="80"></div>
+        <div class="fld"><label for="f-msg">احكيلنا عن مشروعك</label><textarea id="f-msg" name="message" maxlength="2000" placeholder="مثلاً: عندي كافيه بفرعين وبدي أستغني عن أجهزة النداء"></textarea></div>
+        <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <button class="btn" type="submit" id="fbtn">إرسال الرسالة ←</button>
+        <div id="fmsg" role="status" aria-live="polite"></div>
+      </form>
+      <aside class="panel info rv">
+        <div class="row"><span class="ico">✉️</span><div><small>البريد الإلكتروني</small><a href="mailto:contact@vrelix.net">contact@vrelix.net</a></div></div>
+        <div class="row"><span class="ico">📞</span><div><small>الهاتف</small><a href="tel:+962787844005">+962 78 784 4005</a></div></div>
+        <div class="row"><span class="ico">📍</span><div><small>العنوان</small><b style="direction:rtl;unicode-bidi:normal">عمّان — Al Hussein Business Park، مبنى 7، الطابق 3، مكتب 301</b></div></div>
+        <a class="wa" id="waLink" href="https://wa.me/962787844005" target="_blank" rel="noopener">💬 تواصل عبر واتساب</a>
+      </aside>
+    </div>
+  </section>
+
   <section style="padding-top:10px">
     <div class="final rv">
       <h2>جرّبه مجاناً اليوم</h2>
       <p>شغّله على كاشيرك الحالي في دقائق. وقول وداعاً لأجهزة النداء.</p>
-      <a class="btn" href="/staff.html">ابدأ الآن ←</a>
+      <a class="btn" href="#contact">ابدأ الآن ←</a>
     </div>
   </section>
 
-  <footer><a class="brand" href="/" style="font-size:16px">VIRE<b>LIX</b></a><span>© <span id="y"></span> VIRELIX. جميع الحقوق محفوظة.</span></footer>
+  <a class="wafab" href="https://wa.me/962787844005?text=%D9%87%D9%84%D8%A7%D8%8C%20%D8%A8%D8%AF%D9%8A%20%D8%A3%D8%B3%D8%AA%D9%81%D8%B3%D8%B1%20%D8%B9%D9%86%20%D9%86%D8%B8%D8%A7%D9%85%20%D8%A7%D9%84%D9%86%D8%AF%D8%A7%D8%A1" target="_blank" rel="noopener" aria-label="واتساب">💬</a>
+  <footer><a class="brand" href="/" style="font-size:16px">VIRE<b>LIX</b></a><span><a href="/staff.html" style="opacity:.7">لوحة الكاشير</a> · © <span id="y"></span> VIRELIX. جميع الحقوق محفوظة.</span></footer>
 </div>
 <script>
 document.getElementById('y').textContent = new Date().getFullYear();
@@ -181,6 +238,30 @@ function tick() {
   k++;
 }
 tick(); setInterval(tick, 2600);
+
+// contact form
+const cf = document.getElementById('cf'), fmsg = document.getElementById('fmsg'), fbtn = document.getElementById('fbtn');
+cf.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const d = Object.fromEntries(new FormData(cf));
+  fmsg.className = ''; fmsg.textContent = '';
+  fbtn.disabled = true;
+  try {
+    const r = await fetch('/api/contact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || 'صار خطأ، جرّب مرة ثانية أو راسلنا على واتساب');
+    fmsg.className = 'ok'; fmsg.textContent = 'وصلتنا رسالتك ✓ رح نرد عليك خلال يوم عمل.';
+    cf.reset();
+  } catch (err) { fmsg.className = 'bad'; fmsg.textContent = err.message; }
+  fbtn.disabled = false;
+});
+// keep WhatsApp button in sync with what the visitor typed
+const wa = document.getElementById('waLink');
+cf.addEventListener('input', () => {
+  const d = Object.fromEntries(new FormData(cf));
+  const t = `هلا، أنا ${d.name || ''}${d.company ? ' من ' + d.company : ''}.\nبخصوص: ${d.topic}\n${d.message || ''}`.trim();
+  wa.href = 'https://wa.me/962787844005?text=' + encodeURIComponent(t);
+});
 const io = new IntersectionObserver((es) => es.forEach((e) => e.isIntersecting && (e.target.classList.add('in'), io.unobserve(e.target))), { threshold: .12 });
 document.querySelectorAll('.rv').forEach((el) => io.observe(el));
 </script>
