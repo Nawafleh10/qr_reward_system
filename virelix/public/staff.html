@@ -66,7 +66,7 @@ async function load() {
   }
 }
 $('go').onclick = () => { pin = $('pin').value; login(); };
-$('pin').onkeydown = (e) => e.key === 'Enter' && $('go').click();
+$('pin').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('go').click(); });
 $('newOrder').onclick = async () => {
   const r = await fetch('/api/orders', { method: 'POST', headers: H(), body: JSON.stringify({ note: $('note').value }) });
   if (r.ok) { $('note').value = ''; showQr(await r.json()); load(); }
