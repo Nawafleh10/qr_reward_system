@@ -53,7 +53,7 @@ async function startDemo() {
 async function login() {
   if (isDemo) return startDemo();
   const r = await fetch('/api/staff/login', { method: 'POST', headers: H(), body: JSON.stringify({ pin }) });
-  if (!r.ok) { $('loginErr').textContent = 'الرمز غير صحيح'; sessionStorage.removeItem('vx-pin'); return; }
+  if (!r.ok) { const j = await r.json().catch(() => ({})); $('loginErr').textContent = r.status === 429 ? j.error : 'الرمز غير صحيح'; sessionStorage.removeItem('vx-pin'); return; }
   sessionStorage.setItem('vx-pin', pin);
   $('login').hidden = true; $('app').hidden = false;
   load();

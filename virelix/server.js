@@ -13,8 +13,12 @@ try {
 } catch (_) {}
 
 const PORT = process.env.PORT || 4100;
-const BASE = (process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
+const ENV_BASE = (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
+// Public address put into QR codes. Uses PUBLIC_BASE_URL when set to a real address, otherwise the address the cashier opened the page on.
+const baseFor = (req) => (ENV_BASE && !/localhost|127\.0\.0\.1/.test(ENV_BASE) ? ENV_BASE : `${req.protocol}://${req.get('host')}`);
+const IS_PROD = process.env.NODE_ENV === 'production' || !!process.env.RENDER;
 const PIN = process.env.STAFF_PIN || '2112';
+if (IS_PROD && !process.env.STAFF_PIN) console.warn('WARNING: STAFF_PIN is not set - using the public default. Set it in the hosting dashboard!');
 const DATA_DIR = process.env.DATA_DIR || __dirname; // point at a persistent disk in production
 fs.mkdirSync(DATA_DIR, { recursive: true });
 const DB_FILE = path.join(DATA_DIR, 'data.json');
@@ -69,8 +73,21 @@ app.set('trust proxy', 1); // behind a hosting proxy: real client IP for rate li
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-const staffOnly = (req, res, next) =>
-  (req.get('x-staff-pin') || req.query.pin) === PIN ? next() : res.status(401).json({ error: 'Wrong PIN' });
+// PIN check with brute-force lockout: 10 wrong attempts per IP -> locked for 15 minutes.
+const pinFails = new Map(); // ip -> [timestamps]
+const safeEq = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
+function checkPin(req, given) { // -> 'ok' | 'bad' | 'none' | 'locked'
+  if (given === undefined || given === '') return 'none';
+  const now = Date.now(), f = (pinFails.get(req.ip) || []).filter((t) => now - t < 15 * 60000);
+  if (f.length >= 10) return 'locked';
+  if (safeEq(given, PIN)) return 'ok';
+  pinFails.set(req.ip, [...f, now]); return 'bad';
+}
+const pinReject = (res, r) => r === 'locked' ? res.status(429).json({ error: 'محاولات كثيرة، جرّب بعد 15 دقيقة' }) : res.status(401).json({ error: 'Wrong PIN' });
+const staffOnly = (req, res, next) => {
+  const r = checkPin(req, req.get('x-staff-pin') || req.query.pin);
+  return r === 'ok' ? next() : pinReject(res, r);
+};
 
 // Orders API accepts the real PIN (scope '') or a demo key (scope = that key, sandboxed).
 const staffOrDemo = (req, res, next) => {
@@ -79,8 +96,9 @@ const staffOrDemo = (req, res, next) => {
     if (!demos.has(dk)) return res.status(401).json({ error: 'انتهت جلسة التجربة، افتح التجربة من جديد' });
     req.scope = dk; return next();
   }
-  if ((req.get('x-staff-pin') || req.query.pin) === PIN) { req.scope = ''; return next(); }
-  res.status(401).json({ error: 'Wrong PIN' });
+  const r = checkPin(req, req.get('x-staff-pin') || req.query.pin);
+  if (r === 'ok') { req.scope = ''; return next(); }
+  pinReject(res, r);
 };
 
 // Start a private demo cashier (no PIN). Rate limited per IP.
@@ -98,8 +116,10 @@ app.post('/api/demo/start', (req, res) => {
   res.status(201).json({ key, expiresInMinutes: DEMO_TTL / 60000 });
 });
 
-app.post('/api/staff/login', (req, res) =>
-  req.body && req.body.pin === PIN ? res.json({ ok: true }) : res.status(401).json({ error: 'Wrong PIN' }));
+app.post('/api/staff/login', (req, res) => {
+  const r = checkPin(req, req.body && req.body.pin);
+  return r === 'ok' ? res.json({ ok: true }) : pinReject(res, r);
+});
 
 // Cashier creates an order -> gets number + link/QR for the customer
 app.post('/api/orders', staffOrDemo, (req, res) => {
@@ -120,12 +140,12 @@ app.post('/api/orders', staffOrDemo, (req, res) => {
     ...(req.scope ? { demo: req.scope } : {}),
   };
   db.orders[token] = order; save(); push(order);
-  res.status(201).json({ ...order, url: `${BASE}/o.html?t=${token}` });
+  res.status(201).json({ ...order, url: `${baseFor(req)}/o.html?t=${token}` });
 });
 
 app.get('/api/orders', staffOrDemo, (req, res) => {
   res.json(Object.values(db.orders).filter((o) => (o.demo || '') === req.scope).filter((o) => o.status !== 'DELIVERED' || Date.now() - (o.deliveredAt || 0) < 600000)
-    .sort((a, b) => a.createdAt - b.createdAt).map((o) => ({ ...o, url: `${BASE}/o.html?t=${o.token}` })));
+    .sort((a, b) => a.createdAt - b.createdAt).map((o) => ({ ...o, url: `${baseFor(req)}/o.html?t=${o.token}` })));
 });
 
 app.post('/api/orders/:token/status', staffOrDemo, (req, res) => {
@@ -183,4 +203,4 @@ app.get('/api/qr', async (req, res) => {
 });
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
-app.listen(PORT, '0.0.0.0', () => console.log(`Virelix listening on ${BASE} (staff: /staff.html)`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Virelix listening on port ${PORT} (public base: ${ENV_BASE || 'auto'}, staff: /staff.html)`));
