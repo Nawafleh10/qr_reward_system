@@ -31,12 +31,24 @@ function beep() {
     });
   } catch (_) {}
 }
+let ringTimer = null;
+function ringOnce() {
+  if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 800]);
+  beep();
+}
+function stopRing() {
+  clearInterval(ringTimer); ringTimer = null;
+  clearInterval(flashTimer); document.title = baseTitle;
+  if (navigator.vibrate) navigator.vibrate(0);
+  const b = document.getElementById('stopBtn'); if (b) b.remove();
+}
 function alertReady(o) {
   if (alerted) return; alerted = true;
-  if (navigator.vibrate) navigator.vibrate([400, 150, 400, 150, 600]);
-  beep();
+  ringOnce();
+  ringTimer = setInterval(ringOnce, 2500); // keep buzzing until the customer taps "got it"
+  setTimeout(stopRing, 120000);
   if ('Notification' in window && Notification.permission === 'granted') {
-    try { new Notification('طلبك جاهز! 🔔', { body: `رقم ${o.number} — تفضّل استلم طلبك`, tag: 'virelix' }); } catch (_) {}
+    try { new Notification('طلبك جاهز! 🔔', { body: `رقم ${o.number} — تفضّل استلم طلبك`, tag: 'virelix', requireInteraction: true }); } catch (_) {}
   }
   let on = false;
   flashTimer = setInterval(() => { document.title = (on = !on) ? '🔔 طلبك جاهز!' : baseTitle; }, 900);
@@ -55,7 +67,11 @@ function render(o) {
     document.body.classList.add('ready');
     card.innerHTML = `<div class="ready-bell">🔔</div><h1 style="margin:6px 0">${o.status === 'READY' ? 'طلبك جاهز!' : 'بالعافية!'}</h1>
       <div class="num" style="font-size:72px">${o.number}</div><div>${o.status === 'READY' ? 'تفضّل استلم طلبك من الكاونتر' : 'نتمنى تكون استمتعت 🙌'}</div>`;
-    if (o.status === 'READY') alertReady(o);
+    if (o.status === 'READY') {
+      alertReady(o);
+      if (ringTimer && !document.getElementById('stopBtn')) card.insertAdjacentHTML('beforeend', '<button class="full" id="stopBtn">استلمت طلبي ✓</button>');
+      const sb = document.getElementById('stopBtn'); if (sb) sb.onclick = stopRing;
+    } else stopRing();
     return;
   }
   const idx = STEPS.findIndex((s) => s[0] === o.status);
