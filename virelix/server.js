@@ -24,25 +24,38 @@ const STATUSES = ['RECEIVED', 'PREPARING', 'READY', 'DELIVERED'];
 let db = { day: '', counter: 0, orders: {}, leads: [] };
 try { db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); } catch (_) {}
 db.leads = db.leads || [];
-const save = () => fs.writeFile(DB_FILE, JSON.stringify(db), () => {});
+// demo orders live in memory only and are never written to disk
+const save = () => fs.writeFile(DB_FILE, JSON.stringify({ ...db, orders: Object.fromEntries(Object.entries(db.orders).filter(([, o]) => !o.demo)) }), () => {});
 const today = () => new Date().toISOString().slice(0, 10);
+
+// ---- per-visitor demo sandboxes: private, in-memory, auto-expiring ----
+const DEMO_TTL = 3 * 3600 * 1000, DEMO_MAX_SESSIONS = 300, DEMO_MAX_ORDERS = 30;
+const demos = new Map(); // key -> { counter, createdAt }
+const demoStarts = new Map(); // ip -> [timestamps]
+function pruneDemos() {
+  const cutoff = Date.now() - DEMO_TTL;
+  for (const [k, d] of demos) if (d.createdAt < cutoff) demos.delete(k);
+  for (const [t, o] of Object.entries(db.orders)) if (o.demo && !demos.has(o.demo)) delete db.orders[t];
+}
+setInterval(pruneDemos, 10 * 60 * 1000).unref();
 
 function pruneOld() {
   const cutoff = Date.now() - 24 * 3600 * 1000;
-  for (const [t, o] of Object.entries(db.orders)) if (o.createdAt < cutoff) delete db.orders[t];
+  for (const [t, o] of Object.entries(db.orders)) if (!o.demo && o.createdAt < cutoff) delete db.orders[t];
 }
 
 // ---- live updates (Server-Sent Events) ----
 const watchers = new Map(); // token -> Set(res)
-const staffWatchers = new Set();
+const staffWatchers = new Map(); // res -> scope ('' for the real cashier, demo key for a sandbox)
 const publicOrder = (o) => ({
   number: o.number, status: o.status, note: o.note, createdAt: o.createdAt, readyAt: o.readyAt || null,
+  demo: !!o.demo,
   waiting: o.status === 'READY' ? 0 : Object.values(db.orders).filter(
-    (x) => x.createdAt < o.createdAt && ['RECEIVED', 'PREPARING'].includes(x.status)).length,
+    (x) => (x.demo || '') === (o.demo || '') && x.createdAt < o.createdAt && ['RECEIVED', 'PREPARING'].includes(x.status)).length,
 });
 function push(o) {
   for (const r of watchers.get(o.token) || []) r.write(`data: ${JSON.stringify(publicOrder(o))}\n\n`);
-  for (const r of staffWatchers) r.write(`data: ping\n\n`);
+  for (const [r, scope] of staffWatchers) if (scope === (o.demo || '')) r.write(`data: ping\n\n`);
 }
 function sse(res) {
   res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
@@ -59,31 +72,66 @@ app.use(express.static(path.join(__dirname, 'public')));
 const staffOnly = (req, res, next) =>
   (req.get('x-staff-pin') || req.query.pin) === PIN ? next() : res.status(401).json({ error: 'Wrong PIN' });
 
+// Orders API accepts the real PIN (scope '') or a demo key (scope = that key, sandboxed).
+const staffOrDemo = (req, res, next) => {
+  const dk = req.get('x-demo-key') || req.query.demo;
+  if (dk) {
+    if (!demos.has(dk)) return res.status(401).json({ error: 'انتهت جلسة التجربة، افتح التجربة من جديد' });
+    req.scope = dk; return next();
+  }
+  if ((req.get('x-staff-pin') || req.query.pin) === PIN) { req.scope = ''; return next(); }
+  res.status(401).json({ error: 'Wrong PIN' });
+};
+
+// Start a private demo cashier (no PIN). Rate limited per IP.
+app.post('/api/demo/start', (req, res) => {
+  const now = Date.now(), recent = (demoStarts.get(req.ip) || []).filter((t) => now - t < 3600000);
+  if (recent.length >= 10) return res.status(429).json({ error: 'محاولات كثيرة، جرّب بعد قليل' });
+  pruneDemos();
+  if (demos.size >= DEMO_MAX_SESSIONS) {
+    const oldest = [...demos.entries()].sort((a, b) => a[1].createdAt - b[1].createdAt)[0];
+    demos.delete(oldest[0]); pruneDemos();
+  }
+  demoStarts.set(req.ip, [...recent, now]);
+  const key = crypto.randomBytes(12).toString('base64url');
+  demos.set(key, { counter: 0, createdAt: now });
+  res.status(201).json({ key, expiresInMinutes: DEMO_TTL / 60000 });
+});
+
 app.post('/api/staff/login', (req, res) =>
   req.body && req.body.pin === PIN ? res.json({ ok: true }) : res.status(401).json({ error: 'Wrong PIN' }));
 
 // Cashier creates an order -> gets number + link/QR for the customer
-app.post('/api/orders', staffOnly, (req, res) => {
-  if (db.day !== today()) { db.day = today(); db.counter = 0; }
-  pruneOld();
+app.post('/api/orders', staffOrDemo, (req, res) => {
+  let number;
+  if (req.scope) {
+    const d = demos.get(req.scope);
+    if (Object.values(db.orders).filter((o) => o.demo === req.scope).length >= DEMO_MAX_ORDERS)
+      return res.status(429).json({ error: 'وصلت الحد الأقصى لطلبات التجربة. تواصل معنا لتفعيل نسختك 🙂' });
+    number = ++d.counter;
+  } else {
+    if (db.day !== today()) { db.day = today(); db.counter = 0; }
+    pruneOld(); number = ++db.counter;
+  }
   const token = crypto.randomBytes(9).toString('base64url');
   const order = {
-    token, number: ++db.counter, status: 'RECEIVED',
+    token, number, status: 'RECEIVED',
     note: String(req.body.note || '').slice(0, 60), createdAt: Date.now(),
+    ...(req.scope ? { demo: req.scope } : {}),
   };
   db.orders[token] = order; save(); push(order);
   res.status(201).json({ ...order, url: `${BASE}/o.html?t=${token}` });
 });
 
-app.get('/api/orders', staffOnly, (req, res) => {
-  res.json(Object.values(db.orders).filter((o) => o.status !== 'DELIVERED' || Date.now() - (o.deliveredAt || 0) < 600000)
+app.get('/api/orders', staffOrDemo, (req, res) => {
+  res.json(Object.values(db.orders).filter((o) => (o.demo || '') === req.scope).filter((o) => o.status !== 'DELIVERED' || Date.now() - (o.deliveredAt || 0) < 600000)
     .sort((a, b) => a.createdAt - b.createdAt).map((o) => ({ ...o, url: `${BASE}/o.html?t=${o.token}` })));
 });
 
-app.post('/api/orders/:token/status', staffOnly, (req, res) => {
+app.post('/api/orders/:token/status', staffOrDemo, (req, res) => {
   const o = db.orders[req.params.token];
   const status = req.body && req.body.status;
-  if (!o) return res.status(404).json({ error: 'Not found' });
+  if (!o || (o.demo || '') !== req.scope) return res.status(404).json({ error: 'Not found' });
   if (!STATUSES.includes(status)) return res.status(400).json({ error: 'Bad status' });
   o.status = status;
   if (status === 'READY') o.readyAt = Date.now();
@@ -91,7 +139,7 @@ app.post('/api/orders/:token/status', staffOnly, (req, res) => {
   save(); push(o); res.json(o);
 });
 
-app.get('/api/staff/stream', staffOnly, (req, res) => { sse(res); staffWatchers.add(res); res.on('close', () => staffWatchers.delete(res)); });
+app.get('/api/staff/stream', staffOrDemo, (req, res) => { sse(res); staffWatchers.set(res, req.scope); res.on('close', () => staffWatchers.delete(res)); });
 
 // Customer endpoints (token is the only credential)
 app.get('/api/orders/:token', (req, res) => {

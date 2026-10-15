@@ -15,6 +15,7 @@
     <div class="err" id="loginErr"></div>
   </div>
   <div id="app" hidden>
+    <div id="demoBar" hidden class="card" style="padding:14px 18px;margin-bottom:14px;text-align:start;background:#14103a;color:#fff"><b>🧪 وضع التجربة</b> — هاي نسخة خاصة فيك وبياناتها بتنحذف بعد ساعات. جرّب: «+ طلب جديد»، وافتح صفحة الزبون من نافذة الـQR، وبعدين اضغط «جاهز ✓».</div>
     <div class="row"><input id="note" placeholder="ملاحظة (اختياري) مثل: آيس لاتيه" maxlength="60" /><button class="lime" id="newOrder">+ طلب جديد</button></div>
     <div class="orders" id="orders"></div>
     <details id="leadsBox" style="margin-top:26px"><summary style="cursor:pointer;font-weight:700">رسائل التواصل من الموقع (<span id="leadN">0</span>)</summary><div class="orders" id="leads"></div></details>
@@ -24,15 +25,33 @@
   <h2 style="margin-top:0">طلب رقم <span id="dNum"></span></h2>
   <p>خلّي الزبون يمسح الكود بكاميرا جواله</p>
   <img id="dQr" alt="QR" />
-  <div><button id="dClose" class="full">تم</button></div>
+  <div><a id="dOpen" class="btn full" style="display:block;background:#c6f432;color:#111;text-decoration:none" target="_blank" rel="noopener">افتح صفحة الزبون هنا ↗</a><button id="dClose" class="full">تم</button></div>
 </dialog>
 <script>
-let pin = sessionStorage.getItem('vx-pin') || '';
+const isDemo = new URLSearchParams(location.search).has('demo');
+let pin = isDemo ? '' : (sessionStorage.getItem('vx-pin') || '');
+let demoKey = isDemo ? (sessionStorage.getItem('vx-demo') || '') : '';
 const $ = (id) => document.getElementById(id);
-const H = () => ({ 'Content-Type': 'application/json', 'x-staff-pin': pin });
+const H = () => (demoKey ? { 'Content-Type': 'application/json', 'x-demo-key': demoKey } : { 'Content-Type': 'application/json', 'x-staff-pin': pin });
 const LABEL = { RECEIVED: 'جديد', PREPARING: 'قيد التحضير', READY: 'جاهز', DELIVERED: 'تم التسليم' };
 
+async function startDemo() {
+  if (demoKey) { // reuse the visitor's sandbox if it is still alive
+    const r = await fetch('/api/orders', { headers: H() });
+    if (!r.ok) { demoKey = ''; sessionStorage.removeItem('vx-demo'); }
+  }
+  if (!demoKey) {
+    const r = await fetch('/api/demo/start', { method: 'POST' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { $('loginErr').textContent = j.error || 'تعذّر بدء التجربة'; return; }
+    demoKey = j.key; sessionStorage.setItem('vx-demo', demoKey);
+  }
+  $('login').hidden = true; $('app').hidden = false; $('demoBar').hidden = false; $('leadsBox').remove();
+  load();
+  new EventSource('/api/staff/stream?demo=' + encodeURIComponent(demoKey)).onmessage = load;
+}
 async function login() {
+  if (isDemo) return startDemo();
   const r = await fetch('/api/staff/login', { method: 'POST', headers: H(), body: JSON.stringify({ pin }) });
   if (!r.ok) { $('loginErr').textContent = 'الرمز غير صحيح'; sessionStorage.removeItem('vx-pin'); return; }
   sessionStorage.setItem('vx-pin', pin);
@@ -43,6 +62,7 @@ async function login() {
 }
 function showQr(o) {
   $('dNum').textContent = o.number;
+  $('dOpen').href = o.url;
   $('dQr').src = '/api/qr?data=' + encodeURIComponent(o.url);
   $('dlg').showModal();
 }
@@ -82,7 +102,7 @@ $('newOrder').onclick = async () => {
   if (r.ok) { $('note').value = ''; showQr(await r.json()); load(); }
 };
 $('dClose').onclick = () => $('dlg').close();
-if (pin) login();
+if (isDemo || pin) login();
 </script>
 </body>
 </html>
