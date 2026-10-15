@@ -22,18 +22,16 @@ const baseTitle = document.title;
 function beep() {
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    [0, 0.25, 0.5].forEach((t) => {
-      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-      o.frequency.value = 880; o.connect(g); g.connect(audioCtx.destination);
-      g.gain.setValueAtTime(0.4, audioCtx.currentTime + t);
-      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + t + 0.2);
-      o.start(audioCtx.currentTime + t); o.stop(audioCtx.currentTime + t + 0.22);
-    });
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain(), t = audioCtx.currentTime;
+    o.type = 'square'; o.frequency.value = 988; o.connect(g); g.connect(audioCtx.destination);
+    g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+    o.start(t); o.stop(t + 0.36);
   } catch (_) {}
 }
 let ringTimer = null;
 function ringOnce() {
-  if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 800]);
+  if (navigator.vibrate) navigator.vibrate(300);
   beep();
 }
 function stopRing() {
@@ -45,8 +43,7 @@ function stopRing() {
 function alertReady(o) {
   if (alerted) return; alerted = true;
   ringOnce();
-  ringTimer = setInterval(ringOnce, 2500); // keep buzzing until the customer taps "got it"
-  setTimeout(stopRing, 120000);
+  ringTimer = setInterval(ringOnce, 500); // ring every half second until the customer taps the bell
   if ('Notification' in window && Notification.permission === 'granted') {
     try { new Notification('طلبك جاهز! 🔔', { body: `رقم ${o.number} — تفضّل استلم طلبك`, tag: 'virelix', requireInteraction: true }); } catch (_) {}
   }
@@ -65,12 +62,13 @@ function render(o) {
   last = o;
   if (o.status === 'READY' || o.status === 'DELIVERED') {
     document.body.classList.add('ready');
-    card.innerHTML = `<div class="ready-bell">🔔</div><h1 style="margin:6px 0">${o.status === 'READY' ? 'طلبك جاهز!' : 'بالعافية!'}</h1>
+    card.innerHTML = `<div class="ready-bell" id="bell" style="cursor:pointer">🔔</div><h1 style="margin:6px 0">${o.status === 'READY' ? 'طلبك جاهز!' : 'بالعافية!'}</h1>
       <div class="num" style="font-size:72px">${o.number}</div><div>${o.status === 'READY' ? 'تفضّل استلم طلبك من الكاونتر' : 'نتمنى تكون استمتعت 🙌'}</div>`;
     if (o.status === 'READY') {
       alertReady(o);
-      if (ringTimer && !document.getElementById('stopBtn')) card.insertAdjacentHTML('beforeend', '<button class="full" id="stopBtn">استلمت طلبي ✓</button>');
+      if (ringTimer && !document.getElementById('stopBtn')) card.insertAdjacentHTML('beforeend', '<button class="full" id="stopBtn">اضغط الجرس لإيقاف الرنة 🔕</button>');
       const sb = document.getElementById('stopBtn'); if (sb) sb.onclick = stopRing;
+      document.getElementById('bell').onclick = stopRing;
     } else stopRing();
     return;
   }
