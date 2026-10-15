@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: virelix
+    runtime: node
+    rootDir: virelix
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    plan: starter            # persistent disk needs a paid plan; free plan loses data.json on restart
+    envVars:
+      - key: PUBLIC_BASE_URL
+        sync: false          # set to your final URL, e.g. https://virelix.onrender.com
+      - key: STAFF_PIN
+        sync: false          # choose a strong PIN
+      - key: DATA_DIR
+        value: /var/data
+    disk:
+      name: virelix-data
+      mountPath: /var/data
+      sizeGB: 1

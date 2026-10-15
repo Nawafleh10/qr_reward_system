@@ -15,7 +15,9 @@ try {
 const PORT = process.env.PORT || 4100;
 const BASE = (process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
 const PIN = process.env.STAFF_PIN || '1234';
-const DB_FILE = path.join(__dirname, 'data.json');
+const DATA_DIR = process.env.DATA_DIR || __dirname; // point at a persistent disk in production
+fs.mkdirSync(DATA_DIR, { recursive: true });
+const DB_FILE = path.join(DATA_DIR, 'data.json');
 const STATUSES = ['RECEIVED', 'PREPARING', 'READY', 'DELIVERED'];
 
 // ---- tiny JSON-file store: { day, counter, orders: { token: order } } ----
@@ -50,6 +52,7 @@ function sse(res) {
 }
 
 const app = express();
+app.set('trust proxy', 1); // behind a hosting proxy: real client IP for rate limiting
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -132,4 +135,4 @@ app.get('/api/qr', async (req, res) => {
 });
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
-app.listen(PORT, () => console.log(`Virelix listening on ${BASE} (staff: /staff.html)`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Virelix listening on ${BASE} (staff: /staff.html)`));
