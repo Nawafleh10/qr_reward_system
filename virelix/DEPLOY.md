@@ -4,8 +4,7 @@
 1. افتح هذا الرابط (يتطلب حساب Render، وسجّل بحساب GitHub):
    **https://render.com/deploy?repo=https://github.com/Nawafleh10/qr_reward_system**
 2. اكتب قيمة **STAFF_PIN** (الرمز السري للكاشير). لا تتركه فارغاً، واختر رمزاً أطول من 4 أرقام إن أمكن.
-3. (اختياري، يُنصح به) اكتب **LEADS_WEBHOOK_URL**: رابط Webhook من Discord أو Slack لتصلك رسائل التواصل فوراً (انظر بالأسفل).
-4. اضغط **Apply**. بعد دقيقتين تحصل على رابط مثل `https://virelix.onrender.com`.
+3. اضغط **Apply**. بعد دقيقتين تحصل على رابط مثل `https://virelix.onrender.com`.
 
 إذا ظهر أن الريبو خاص (private)، افتح Render ← **New → Blueprint** واختر الريبو يدوياً.
 
@@ -17,7 +16,7 @@
 
 ## إشعار رسائل التواصل عبر Discord (مجاني)
 1. في Discord: أنشئ سيرفر/قناة خاصة ← **إعدادات القناة → التكاملات → Webhooks → webhook جديد**.
-2. انسخ رابط الـ Webhook وضعه في المتغير `LEADS_WEBHOOK_URL` على Render (Environment).
+2. انسخ رابط الـ Webhook. في Render: خدمتك ← **Environment ← Add Environment Variable**، الاسم `LEADS_WEBHOOK_URL` والقيمة الرابط، ثم احفظ (تُعاد التشغيلة تلقائياً).
 3. كل رسالة من فورم الموقع ستصل للقناة (وللجوال عبر تطبيق Discord).
 (Slack يعمل بنفس الطريقة برابط Incoming Webhook.)
 

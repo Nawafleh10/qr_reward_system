@@ -12,5 +12,3 @@ services:
         value: production
       - key: STAFF_PIN
         sync: false          # you type it in the Render dashboard (never commit it)
-      - key: LEADS_WEBHOOK_URL
-        sync: false          # optional: Discord/Slack webhook that receives every contact-form message
