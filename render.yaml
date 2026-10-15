@@ -6,15 +6,11 @@ services:
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /health
-    plan: starter            # a persistent disk needs a paid plan; on the free plan data.json is lost on every restart
+    plan: free               # free: sleeps after ~15 min idle, and data.json resets on restart (see DEPLOY.md)
     envVars:
       - key: NODE_ENV
         value: production
       - key: STAFF_PIN
         sync: false          # you type it in the Render dashboard (never commit it)
-      - key: DATA_DIR
-        value: /var/data
-    disk:
-      name: virelix-data
-      mountPath: /var/data
-      sizeGB: 1
+      - key: LEADS_WEBHOOK_URL
+        sync: false          # optional: Discord/Slack webhook that receives every contact-form message

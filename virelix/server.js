@@ -176,6 +176,15 @@ app.get('/api/orders/:token/stream', (req, res) => {
   res.on('close', () => watchers.get(o.token)?.delete(res));
 });
 
+// Optional: forward each lead to a Discord/Slack-style webhook so it survives hosts with no persistent disk.
+function notifyLead(l) {
+  const url = process.env.LEADS_WEBHOOK_URL;
+  if (!url) return;
+  const text = `📩 رسالة جديدة من موقع VIRELIX\nالاسم: ${l.name}\nالتواصل: ${l.contact}${l.company ? '\nالشركة: ' + l.company : ''}\nالموضوع: ${l.topic}\n${l.message}`.slice(0, 1900);
+  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: text, text }) })
+    .catch((e) => console.error('lead webhook failed:', e.message));
+}
+
 // Contact form (public). Saved on the server; staff read them via /api/leads.
 const hits = new Map(); // ip -> [timestamps] (max 5 per hour)
 app.post('/api/contact', (req, res) => {
@@ -191,6 +200,7 @@ app.post('/api/contact', (req, res) => {
     return res.status(400).json({ error: 'اكتب اسمك وبريدك الإلكتروني أو رقم جوالك بشكل صحيح' });
   hits.set(ip, [...recent, now]);
   db.leads.push(lead); save();
+  notifyLead(lead);
   console.log(`New contact lead: ${lead.name} <${lead.contact}> [${lead.topic}]`);
   res.status(201).json({ ok: true });
 });
