@@ -1,0 +1,9 @@
+{
+  "name": "virelix",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Virelix - web-based order pager. Customer scans a QR, gets live order status on their phone, no app and no pager device.",
+  "main": "server.js",
+  "scripts": { "dev": "node server.js", "start": "node server.js" },
+  "dependencies": { "express": "^4.19.2", "qrcode": "^1.5.4" }
+}

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>الكاشير | Virelix</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="wrap" style="max-width:640px">
+  <div class="brand"><span class="logo">◉</span> Virelix — الكاشير</div>
+  <div id="login" class="card">
+    <p>أدخل الرمز السري</p>
+    <div class="row"><input id="pin" type="password" inputmode="numeric" placeholder="PIN" /><button id="go">دخول</button></div>
+    <div class="err" id="loginErr"></div>
+  </div>
+  <div id="app" hidden>
+    <div class="row"><input id="note" placeholder="ملاحظة (اختياري) مثل: آيس لاتيه" maxlength="60" /><button class="lime" id="newOrder">+ طلب جديد</button></div>
+    <div class="orders" id="orders"></div>
+  </div>
+</div>
+<dialog id="dlg">
+  <h2 style="margin-top:0">طلب رقم <span id="dNum"></span></h2>
+  <p>خلّي الزبون يمسح الكود بكاميرا جواله</p>
+  <img id="dQr" alt="QR" />
+  <div><button id="dClose" class="full">تم</button></div>
+</dialog>
+<script>
+let pin = sessionStorage.getItem('vx-pin') || '';
+const $ = (id) => document.getElementById(id);
+const H = () => ({ 'Content-Type': 'application/json', 'x-staff-pin': pin });
+const LABEL = { RECEIVED: 'جديد', PREPARING: 'قيد التحضير', READY: 'جاهز', DELIVERED: 'تم التسليم' };
+
+async function login() {
+  const r = await fetch('/api/staff/login', { method: 'POST', headers: H(), body: JSON.stringify({ pin }) });
+  if (!r.ok) { $('loginErr').textContent = 'الرمز غير صحيح'; sessionStorage.removeItem('vx-pin'); return; }
+  sessionStorage.setItem('vx-pin', pin);
+  $('login').hidden = true; $('app').hidden = false;
+  load();
+  const es = new EventSource('/api/staff/stream?pin=' + encodeURIComponent(pin));
+  es.onmessage = load;
+}
+function showQr(o) {
+  $('dNum').textContent = o.number;
+  $('dQr').src = '/api/qr?data=' + encodeURIComponent(o.url);
+  $('dlg').showModal();
+}
+async function setStatus(token, status) {
+  await fetch(`/api/orders/${token}/status`, { method: 'POST', headers: H(), body: JSON.stringify({ status }) });
+}
+async function load() {
+  const r = await fetch('/api/orders', { headers: H() });
+  if (!r.ok) return;
+  const list = await r.json();
+  $('orders').innerHTML = '';
+  for (const o of list) {
+    const el = document.createElement('div');
+    el.className = 'o ' + o.status;
+    const next = { RECEIVED: ['PREPARING', 'ابدأ التحضير'], PREPARING: ['READY', 'جاهز ✓'], READY: ['DELIVERED', 'تم التسليم'] }[o.status];
+    el.innerHTML = `<b>${o.number}</b><div class="meta">${LABEL[o.status]}${o.note ? ' · ' + o.note.replace(/</g, '&lt;') : ''}</div><div class="acts"></div>`;
+    const acts = el.querySelector('.acts');
+    const qr = Object.assign(document.createElement('button'), { className: 'ghost', textContent: 'QR' });
+    qr.onclick = () => showQr(o); acts.append(qr);
+    if (next) { const b = Object.assign(document.createElement('button'), { className: o.status === 'PREPARING' ? 'lime' : '', textContent: next[1] }); b.onclick = () => setStatus(o.token, next[0]); acts.append(b); }
+    $('orders').append(el);
+  }
+}
+$('go').onclick = () => { pin = $('pin').value; login(); };
+$('pin').onkeydown = (e) => e.key === 'Enter' && $('go').click();
+$('newOrder').onclick = async () => {
+  const r = await fetch('/api/orders', { method: 'POST', headers: H(), body: JSON.stringify({ note: $('note').value }) });
+  if (r.ok) { $('note').value = ''; showQr(await r.json()); load(); }
+};
+$('dClose').onclick = () => $('dlg').close();
+if (pin) login();
+</script>
+</body>
+</html>
