@@ -14,7 +14,7 @@ try {
 
 const PORT = process.env.PORT || 4100;
 const BASE = (process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
-const PIN = process.env.STAFF_PIN || '1234';
+const PIN = process.env.STAFF_PIN || '2112';
 const DATA_DIR = process.env.DATA_DIR || __dirname; // point at a persistent disk in production
 fs.mkdirSync(DATA_DIR, { recursive: true });
 const DB_FILE = path.join(DATA_DIR, 'data.json');
